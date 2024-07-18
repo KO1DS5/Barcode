@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QRIS Signature Generator with Logo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+</head>
+<body>
+    <h1>Generate QRIS from Signature Image with Logo</h1>
+    <form id="qris-form">
+        <label for="signature-img">Upload Signature Image:</label>
+        <input type="file" id="signature-img" name="signature-img" accept="image/*" required>
+        <br>
+        <label for="logo-img">Upload Logo Image:</label>
+        <input type="file" id="logo-img" name="logo-img" accept="image/*" required>
+        <button type="submit">Generate QRIS</button>
+    </form>
+    <canvas id="qris-canvas" width="250" height="250"></canvas>
+    <p id="barcode-url"></p>
+
+    <script>
+        document.getElementById('qris-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            var fileInput = document.getElementById('signature-img');
+            var logoInput = document.getElementById('logo-img');
+            var file = fileInput.files[0];
+            var logoFile = logoInput.files[0];
+            
+            if (file && logoFile) {
+                var fileName = file.name;
+                
+                var qr = new QRious({
+                    value: fileName,
+                    size: 250
+                });
+                
+                var canvas = document.getElementById('qris-canvas');
+                var context = canvas.getContext('2d');
+                
+                // Draw QR code on canvas
+                var qrImage = new Image();
+                qrImage.src = qr.toDataURL();
+                qrImage.onload = function() {
+                    context.drawImage(qrImage, 0, 0, 250, 250);
+                    
+                    // Draw logo in the center of the QR code
+                    var logoImage = new Image();
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        logoImage.src = e.target.result;
+                        logoImage.onload = function() {
+                            var logoSize = 50;
+                            var logoX = (canvas.width - logoSize) / 2;
+                            var logoY = (canvas.height - logoSize) / 2;
+                            context.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
+                            
+                            // Send the canvas data to the server
+                            var dataURL = canvas.toDataURL('image/png');
+                            var xhr = new XMLHttpRequest();
+                            xhr.open('POST', '/.netlify/functions/save_image', true);
+                            xhr.setRequestHeader('Content-Type', 'application/json');
+                            xhr.onreadystatechange = function() {
+                                if (xhr.readyState == 4 && xhr.status == 200) {
+                                    var response = JSON.parse(xhr.responseText);
+                                    document.getElementById('barcode-url').innerHTML = 'Barcode URL: <a href="' + response.url + '" target="_blank">' + response.url + '</a>';
+                                }
+                            };
+                            xhr.send(JSON.stringify({ imgData: dataURL }));
+                        }
+                    }
+                    reader.readAsDataURL(logoFile);
+                }
+            } else {
+                alert("Please select both a signature image and a logo image.");
+            }
+        });
+    </script>
+</body>
+</html>
